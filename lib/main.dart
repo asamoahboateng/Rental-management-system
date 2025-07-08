@@ -1,23 +1,32 @@
 import 'package:flutter/material.dart';
-import 'package:rental_system/home.dart';
+import 'screens/main_screen.dart';
 
 void main() {
-  runApp(const MyApp());
+  runApp(const RentalApp());
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+class RentalApp extends StatelessWidget {
+  const RentalApp({super.key});
 
-  // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Rental_System',
+      title: 'Rental Management System',
       theme: ThemeData(
-        useMaterial3: true,
+        primarySwatch: Colors.blue,
+        fontFamily: 'Roboto',
+        appBarTheme: AppBarTheme(
+          backgroundColor: Colors.blue.shade900,
+          foregroundColor: Colors.white,
+          elevation: 0,
+        ),
+        floatingActionButtonTheme: FloatingActionButtonThemeData(
+          backgroundColor: Colors.blue.shade900,
+          foregroundColor: Colors.white,
+        ),
       ),
+      home: const MainScreen(),
       debugShowCheckedModeBanner: false,
-      home: const Home(),
     );
   }
 }

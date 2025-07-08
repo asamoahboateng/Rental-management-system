@@ -164,7 +164,7 @@ class _HomeState extends State<Home> {
     return Scaffold(
       backgroundColor: Colors.grey[50],
       appBar: AppBar(
-        backgroundColor: Colors.grey[700],
+        backgroundColor: Colors.blue.shade900,
         elevation: 0,
         title: const Text(
           'Rentals',
@@ -201,7 +201,7 @@ class _HomeState extends State<Home> {
         ],
       ),
       floatingActionButton: FloatingActionButton(
-        backgroundColor: Colors.grey[700],
+        backgroundColor: Colors.blue[900],
         onPressed: () => _showAddItemDialog(context),
         child: const Icon(Icons.add, color: Colors.white),
         tooltip: 'Add New Item',
@@ -214,7 +214,7 @@ class _HomeState extends State<Home> {
             Container(
               padding:
                   const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
-              color: Colors.grey[700],
+              color: Colors.blue.shade900,
               child: TextField(
                 controller: _searchController,
                 decoration: InputDecoration(
@@ -462,14 +462,14 @@ class _HomeState extends State<Home> {
                   ),
                 ),
                 const SizedBox(height: 12),
-                SwitchListTile(
+                /*  SwitchListTile(
                   title: const Text('Available',
                       style: TextStyle(fontFamily: 'Roboto')),
                   value: available,
                   activeColor: Colors.purple[900],
                   onChanged: (value) =>
                       setState(() => available = value), // Update dialog state
-                ),
+                ), */
               ],
             ),
           ),
