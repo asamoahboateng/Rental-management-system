@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../services/auth_service.dart';
+
 import 'login_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -10,8 +10,6 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  final _authService = AuthService();
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -46,12 +44,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       radius: 50,
                       backgroundColor: Colors.blue[900],
                       child: Text(
-                        _authService
-                            .getUserName()
-                            .split(' ')
-                            .map((n) => n[0])
-                            .take(2)
-                            .join(),
+                        '',
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 24,
@@ -61,7 +54,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                     const SizedBox(height: 16),
                     Text(
-                      _authService.getUserName(),
+                      '',
                       style: const TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
@@ -70,7 +63,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      _authService.getUserEmail(),
+                      '',
                       style: const TextStyle(
                         fontSize: 14,
                         color: Colors.grey,
@@ -78,7 +71,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      _authService.getUserPhone(),
+                      '',
                       style: const TextStyle(
                         fontSize: 14,
                         color: Colors.grey,
@@ -87,7 +80,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     const SizedBox(height: 16),
                     ElevatedButton(
                       onPressed: () {
-                        _showEditProfileDialog();
+                        //   _showEditProfileDialog();
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.blue[900],
@@ -229,71 +222,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  void _showEditProfileDialog() {
-    final nameController =
-        TextEditingController(text: _authService.getUserName());
-    final phoneController =
-        TextEditingController(text: _authService.getUserPhone());
-
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(15.0)),
-          title: const Text('Edit Profile'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: nameController,
-                decoration: const InputDecoration(
-                  labelText: 'Full Name',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: phoneController,
-                decoration: const InputDecoration(
-                  labelText: 'Phone Number',
-                  border: OutlineInputBorder(),
-                ),
-                keyboardType: TextInputType.phone,
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              child: const Text('Cancel'),
-              onPressed: () => Navigator.of(context).pop(),
-            ),
-            TextButton(
-              child: Text('Save', style: TextStyle(color: Colors.blue[900])),
-              onPressed: () async {
-                final success = await _authService.updateProfile(
-                  nameController.text.trim(),
-                  phoneController.text.trim(),
-                );
-
-                if (success) {
-                  setState(() {}); // Refresh the UI
-                  Navigator.of(context).pop();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Profile updated successfully'),
-                      backgroundColor: Colors.green,
-                    ),
-                  );
-                }
-              },
-            ),
-          ],
-        );
-      },
-    );
-  }
-
   void _showChangePasswordDialog() {
     final currentPasswordController = TextEditingController();
     final newPasswordController = TextEditingController();
@@ -356,14 +284,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   return;
                 }
 
-                final success = await _authService.changePassword(
-                  currentPasswordController.text,
-                  newPasswordController.text,
-                );
-
                 Navigator.of(context).pop();
 
-                if (success) {
+                /*  if () {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
                       content: Text('Password changed successfully'),
@@ -377,7 +300,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       backgroundColor: Colors.red,
                     ),
                   );
-                }
+                } */
               },
             ),
           ],
@@ -434,7 +357,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             TextButton(
               child: const Text('Logout', style: TextStyle(color: Colors.red)),
               onPressed: () async {
-                await _authService.logout();
+                //  await _authService.logout();
                 Navigator.of(context).pop();
                 Navigator.of(context).pushAndRemoveUntil(
                   MaterialPageRoute(builder: (_) => const LoginScreen()),
