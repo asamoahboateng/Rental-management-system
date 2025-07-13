@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "136059394286",
+    "project_id": "rental-system-c66de",
+    "storage_bucket": "rental-system-c66de.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:136059394286:android:f925b992e722156545bbff",
+        "android_client_info": {
+          "package_name": "com.example.rental_system"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "136059394286-7nh39amslc45vb696a64kdufgsb3s834.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.rental_system",
+            "certificate_hash": "63f4d5d3d45dfbc9eaf48fef088090ca4c51c5e7"
+          }
+        },
+        {
+          "client_id": "136059394286-u54dgavvv57tflra7cl7svhv5ftmcnol.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAGLZDq1qFrVkQ5r5-k-YefOp5MP0rAcAI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "136059394286-u54dgavvv57tflra7cl7svhv5ftmcnol.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

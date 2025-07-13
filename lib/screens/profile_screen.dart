@@ -1,7 +1,16 @@
 import 'package:flutter/material.dart';
+import '../services/auth_service.dart';
+import 'login_screen.dart';
 
-class ProfileScreen extends StatelessWidget {
+class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
+
+  @override
+  State<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends State<ProfileScreen> {
+  final _authService = AuthService();
 
   @override
   Widget build(BuildContext context) {
@@ -36,9 +45,14 @@ class ProfileScreen extends StatelessWidget {
                     CircleAvatar(
                       radius: 50,
                       backgroundColor: Colors.blue[900],
-                      child: const Text(
-                        'RM',
-                        style: TextStyle(
+                      child: Text(
+                        _authService
+                            .getUserName()
+                            .split(' ')
+                            .map((n) => n[0])
+                            .take(2)
+                            .join(),
+                        style: const TextStyle(
                           color: Colors.white,
                           fontSize: 24,
                           fontWeight: FontWeight.bold,
@@ -46,18 +60,26 @@ class ProfileScreen extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 16),
-                    const Text(
-                      'Rental Manager',
-                      style: TextStyle(
+                    Text(
+                      _authService.getUserName(),
+                      style: const TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
                         color: Colors.black87,
                       ),
                     ),
                     const SizedBox(height: 8),
-                    const Text(
-                      'admin@rentalmanager.com',
-                      style: TextStyle(
+                    Text(
+                      _authService.getUserEmail(),
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      _authService.getUserPhone(),
+                      style: const TextStyle(
                         fontSize: 14,
                         color: Colors.grey,
                       ),
@@ -65,7 +87,7 @@ class ProfileScreen extends StatelessWidget {
                     const SizedBox(height: 16),
                     ElevatedButton(
                       onPressed: () {
-                        // Edit profile functionality
+                        _showEditProfileDialog();
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.blue[900],
@@ -93,7 +115,7 @@ class ProfileScreen extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Business Overview for the Month',
+                      'Business Overview',
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
@@ -105,7 +127,7 @@ class ProfileScreen extends StatelessWidget {
                       children: [
                         Expanded(
                           child: _StatItem(
-                            title: 'Monthly Revenue',
+                            title: 'Total Revenue for this month',
                             value: 'GHC 15,420',
                             icon: Icons.attach_money,
                             color: Colors.green,
@@ -156,38 +178,11 @@ class ProfileScreen extends StatelessWidget {
               child: Column(
                 children: [
                   _SettingsItem(
-                    icon: Icons.notifications,
-                    title: 'Notifications',
-                    subtitle: 'Manage your notification preferences',
+                    icon: Icons.lock,
+                    title: 'Change Password',
+                    subtitle: 'Update your account password',
                     onTap: () {
-                      // Navigate to notifications settings
-                    },
-                  ),
-                  const Divider(height: 1),
-                  _SettingsItem(
-                    icon: Icons.security,
-                    title: 'Security',
-                    subtitle: 'Password and security settings',
-                    onTap: () {
-                      // Navigate to security settings
-                    },
-                  ),
-                  const Divider(height: 1),
-                  _SettingsItem(
-                    icon: Icons.backup,
-                    title: 'Backup & Sync',
-                    subtitle: 'Backup your data to cloud',
-                    onTap: () {
-                      // Navigate to backup settings
-                    },
-                  ),
-                  const Divider(height: 1),
-                  _SettingsItem(
-                    icon: Icons.help,
-                    title: 'Help & Support',
-                    subtitle: 'Get help and contact support',
-                    onTap: () {
-                      // Navigate to help
+                      _showChangePasswordDialog();
                     },
                   ),
                   const Divider(height: 1),
@@ -234,6 +229,163 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
+  void _showEditProfileDialog() {
+    final nameController =
+        TextEditingController(text: _authService.getUserName());
+    final phoneController =
+        TextEditingController(text: _authService.getUserPhone());
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(15.0)),
+          title: const Text('Edit Profile'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nameController,
+                decoration: const InputDecoration(
+                  labelText: 'Full Name',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: phoneController,
+                decoration: const InputDecoration(
+                  labelText: 'Phone Number',
+                  border: OutlineInputBorder(),
+                ),
+                keyboardType: TextInputType.phone,
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              child: const Text('Cancel'),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+            TextButton(
+              child: Text('Save', style: TextStyle(color: Colors.blue[900])),
+              onPressed: () async {
+                final success = await _authService.updateProfile(
+                  nameController.text.trim(),
+                  phoneController.text.trim(),
+                );
+
+                if (success) {
+                  setState(() {}); // Refresh the UI
+                  Navigator.of(context).pop();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Profile updated successfully'),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                }
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showChangePasswordDialog() {
+    final currentPasswordController = TextEditingController();
+    final newPasswordController = TextEditingController();
+    final confirmPasswordController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(15.0)),
+          title: const Text('Change Password'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: currentPasswordController,
+                decoration: const InputDecoration(
+                  labelText: 'Current Password',
+                  border: OutlineInputBorder(),
+                ),
+                obscureText: true,
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: newPasswordController,
+                decoration: const InputDecoration(
+                  labelText: 'New Password',
+                  border: OutlineInputBorder(),
+                ),
+                obscureText: true,
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: confirmPasswordController,
+                decoration: const InputDecoration(
+                  labelText: 'Confirm New Password',
+                  border: OutlineInputBorder(),
+                ),
+                obscureText: true,
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              child: const Text('Cancel'),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+            TextButton(
+              child: Text('Change', style: TextStyle(color: Colors.blue[900])),
+              onPressed: () async {
+                if (newPasswordController.text !=
+                    confirmPasswordController.text) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Passwords do not match'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                  return;
+                }
+
+                final success = await _authService.changePassword(
+                  currentPasswordController.text,
+                  newPasswordController.text,
+                );
+
+                Navigator.of(context).pop();
+
+                if (success) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Password changed successfully'),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Current password is incorrect'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   void _showAboutDialog(BuildContext context) {
     showDialog(
       context: context,
@@ -251,7 +403,7 @@ class ProfileScreen extends StatelessWidget {
               Text(
                   'A comprehensive rental management system for managing inventory, clients, and rentals.'),
               SizedBox(height: 8),
-              Text('© 2024 Rental Manager. All rights reserved.'),
+              Text('© 2025 Rental Manager. All rights reserved.'),
             ],
           ),
           actions: [
@@ -281,11 +433,12 @@ class ProfileScreen extends StatelessWidget {
             ),
             TextButton(
               child: const Text('Logout', style: TextStyle(color: Colors.red)),
-              onPressed: () {
+              onPressed: () async {
+                await _authService.logout();
                 Navigator.of(context).pop();
-                // Implement logout functionality
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Logged out successfully')),
+                Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute(builder: (_) => const LoginScreen()),
+                  (route) => false,
                 );
               },
             ),
@@ -296,6 +449,7 @@ class ProfileScreen extends StatelessWidget {
   }
 }
 
+// Keep the existing _StatItem and _SettingsItem classes unchanged
 class _StatItem extends StatelessWidget {
   final String title;
   final String value;
