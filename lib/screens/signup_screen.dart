@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:rental_system/utils/snackbar.dart';
 import 'main_screen.dart';
 
 class SignupScreen extends StatefulWidget {
@@ -39,12 +40,14 @@ class _SignupScreenState extends State<SignupScreen> {
     }
 
     if (!_agreeToTerms) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      /*   ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Please agree to the terms and conditions'),
           backgroundColor: Colors.red,
         ),
-      );
+      ); */
+      errorSnackbarwidget.show(
+          context, 'Please agree to the terms and conditions');
       return;
     }
 
@@ -94,21 +97,23 @@ class _SignupScreenState extends State<SignupScreen> {
           default:
             errorMessage = 'Sign-up failed: ${e.message}';
         }
-        ScaffoldMessenger.of(context).showSnackBar(
+        /*  ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(errorMessage),
             backgroundColor: Colors.red,
           ),
-        );
+        ); */
+        errorSnackbarwidget.show(context, '$errorMessage');
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        /*   ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Sign-up failed: ${e.toString()}'),
             backgroundColor: Colors.red,
           ),
-        );
+        ); */
+        errorSnackbarwidget.show(context, 'Sign-up failed: ${e.toString()}');
       }
     } finally {
       if (mounted) {

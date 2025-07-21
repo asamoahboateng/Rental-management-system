@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:rental_system/utils/snackbar.dart';
 
 import 'signup_screen.dart';
 import 'main_screen.dart';
@@ -66,21 +67,23 @@ class _LoginScreenState extends State<LoginScreen> {
           default:
             errorMessage = 'Login failed: ${e.message}';
         }
-        ScaffoldMessenger.of(context).showSnackBar(
+        /*   ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(errorMessage),
             backgroundColor: Colors.red,
           ),
-        );
+        ); */
+        errorSnackbarwidget.show(context, '$errorMessage');
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        /*   ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Login failed: ${e.toString()}'),
             backgroundColor: Colors.red,
           ),
-        );
+        ); */
+        errorSnackbarwidget.show(context, 'Login failed: ${e.toString()}');
       }
     } finally {
       if (mounted) {
@@ -106,12 +109,13 @@ class _LoginScreenState extends State<LoginScreen> {
         setState(() {
           _isLoading = false;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
+        /*  ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Google Sign-In was cancelled'),
             backgroundColor: Colors.orange,
           ),
-        );
+        ); */
+        errorSnackbarwidget.show(context, 'Google Sign-In was cancelled');
         return;
       }
       print('Google User: ${googleUser.email}');
@@ -147,12 +151,13 @@ class _LoginScreenState extends State<LoginScreen> {
       print('Google Sign-In error: $e');
       print('Stack trace: $stackTrace');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        /*   ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Google Sign-In failed: $e'),
             backgroundColor: Colors.red,
           ),
-        );
+        ); */
+        errorSnackbarwidget.show(context, 'Google Sign-In failed: $e');
       }
     } finally {
       if (mounted) {
@@ -566,21 +571,25 @@ class _LoginScreenState extends State<LoginScreen> {
                     await FirebaseAuth.instance
                         .sendPasswordResetEmail(email: email);
                     Navigator.of(context).pop();
-                    ScaffoldMessenger.of(context).showSnackBar(
+                    /*   ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
                         content: Text(
                             'Password reset instructions sent to your email'),
                         backgroundColor: Colors.green,
                       ),
-                    );
+                    ); */
+                    Snackbarwidget.show(context,
+                        'Password reset instructions sent to your email');
                   } catch (e) {
-                    ScaffoldMessenger.of(context).showSnackBar(
+                    /*   ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
                         content:
                             Text('Failed to send reset email: ${e.toString()}'),
                         backgroundColor: Colors.red,
                       ),
-                    );
+                    ); */
+                    errorSnackbarwidget.show(
+                        context, 'Failed to send reset email: ${e.toString()}');
                   }
                 }
               },

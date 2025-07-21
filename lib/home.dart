@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:rental_system/utils/snackbar.dart';
 
 class RentalItem {
   final String name;
@@ -92,9 +93,10 @@ class _HomeState extends State<Home> {
   void _addItem(String name, int quantity, String price, bool available) {
     // Validate price format (basic check for $X/unit)
     if (!RegExp(r'^\$\d+(\.\d{1,2})?\/unit$').hasMatch(price)) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      /*  ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Price must be in \$X/unit format')),
-      );
+      ); */
+      errorSnackbarwidget.show(context, 'Price must be in \$X/unit format');
       return;
     }
     setState(() {
@@ -113,9 +115,10 @@ class _HomeState extends State<Home> {
       bool available) {
     // Validate price format
     if (!RegExp(r'^\$\d+(\.\d{1,2})?\/unit$').hasMatch(price)) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      /*    ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Price must be in \$X/unit format')),
-      );
+      ); */
+      errorSnackbarwidget.show(context, 'Price must be in \$X/unit format');
       return;
     }
     // Map filteredIndex to rentalItems index
@@ -373,18 +376,21 @@ class _HomeState extends State<Home> {
                 if (nameController.text.trim().isEmpty ||
                     quantityController.text.trim().isEmpty ||
                     priceController.text.trim().isEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(
+                  /*    ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(content: Text('Please fill all fields')),
-                  );
+                  ); */
+                  errorSnackbarwidget.show(context, 'Please fill all fields');
                   return;
                 }
                 try {
                   final quantity = int.parse(quantityController.text.trim());
                   if (quantity < 0) {
-                    ScaffoldMessenger.of(context).showSnackBar(
+                    /*  ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
                           content: Text('Quantity must be non-negative')),
-                    );
+                    ); */
+                    errorSnackbarwidget.show(
+                        context, 'Quantity must be non-negative');
                     return;
                   }
                   _addItem(
@@ -394,14 +400,17 @@ class _HomeState extends State<Home> {
                     available,
                   );
                   Navigator.of(context).pop();
-                  ScaffoldMessenger.of(context).showSnackBar(
+                  /*   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                         content: Text('${nameController.text.trim()} added!')),
-                  );
+                  ); */
+                  Snackbarwidget.show(
+                      context, '${nameController.text.trim()} added!');
                 } catch (e) {
-                  ScaffoldMessenger.of(context).showSnackBar(
+                  /*  ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(content: Text('Invalid quantity format')),
-                  );
+                  ); */
+                  errorSnackbarwidget.show(context, 'Invalid quantity format');
                 }
               },
             ),
@@ -489,18 +498,21 @@ class _HomeState extends State<Home> {
                 if (nameController.text.trim().isEmpty ||
                     quantityController.text.trim().isEmpty ||
                     priceController.text.trim().isEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(
+                  /*   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(content: Text('Please fill all fields')),
-                  );
+                  ); */
+                  errorSnackbarwidget.show(context, 'Please fill all fields');
                   return;
                 }
                 try {
                   final quantity = int.parse(quantityController.text.trim());
                   if (quantity < 0) {
-                    ScaffoldMessenger.of(context).showSnackBar(
+                    /*   ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
                           content: Text('Quantity must be non-negative')),
-                    );
+                    ); */
+                    errorSnackbarwidget.show(
+                        context, 'Quantity must be non-negative');
                     return;
                   }
                   _editItem(
@@ -511,15 +523,18 @@ class _HomeState extends State<Home> {
                     available,
                   );
                   Navigator.of(context).pop();
-                  ScaffoldMessenger.of(context).showSnackBar(
+                  /*   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                         content:
                             Text('${nameController.text.trim()} updated!')),
-                  );
+                  ); */
+                  Snackbarwidget.show(
+                      context, '${nameController.text.trim()} updated!');
                 } catch (e) {
-                  ScaffoldMessenger.of(context).showSnackBar(
+                  /*  ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(content: Text('Invalid quantity format')),
-                  );
+                  ); */
+                  errorSnackbarwidget.show(context, 'Invalid quantity format');
                 }
               },
             ),
@@ -554,9 +569,10 @@ class _HomeState extends State<Home> {
                           _deleteItem(filteredIndex);
                           Navigator.of(context).pop();
                           Navigator.of(context).pop();
-                          ScaffoldMessenger.of(context).showSnackBar(
+                          /*   ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(content: Text('${item.name} deleted!')),
-                          );
+                          ); */
+                          Snackbarwidget.show(context, '${item.name} deleted!');
                         },
                       ),
                     ],

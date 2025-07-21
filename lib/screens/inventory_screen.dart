@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
@@ -9,6 +10,7 @@ import 'package:crypto/crypto.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:rental_system/modals/rental_item.dart';
+import 'package:rental_system/utils/snackbar.dart';
 
 class InventoryScreen extends StatefulWidget {
   const InventoryScreen({super.key});
@@ -56,12 +58,15 @@ class _InventoryScreenState extends State<InventoryScreen> {
 
   Future<String?> _uploadImageToCloudinary(XFile image) async {
     print('Starting Cloudinary upload for image: ${image.path}');
-    const apiKey = '646126543915612';
-    const apiSecret = 'D3rmUdiJyJLTDRUksV8UZf3ftD4';
-    const cloudName = 'ddtivketd'; // REPLACE WITH YOUR CLOUDINARY CLOUD NAME
+
+    final apiKey = dotenv.env['CLOUDINARY_API_KEY']!;
+    final apiSecret = dotenv.env['CLOUDINARY_API_SECRET']!;
+    final cloudName = dotenv.env['CLOUDINARY_CLOUD_NAME']!;
+
     final timestamp = DateTime.now().millisecondsSinceEpoch.toString();
     final signature =
         sha1.convert(utf8.encode('timestamp=$timestamp$apiSecret')).toString();
+
     final uri =
         Uri.parse('https://api.cloudinary.com/v1_1/$cloudName/image/upload');
     final request = http.MultipartRequest('POST', uri)
@@ -124,21 +129,23 @@ class _InventoryScreenState extends State<InventoryScreen> {
           return image;
         } else {
           print('7. No image selected (user canceled)');
-          ScaffoldMessenger.of(context).showSnackBar(
+          /*  ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('No image was selected')),
-          );
+          ); */
+          errorSnackbarwidget.show(context, 'No image was selected');
           return null;
         }
       } catch (e) {
         print('8. Error in image picker: $e');
-        ScaffoldMessenger.of(context).showSnackBar(
+        /*   ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Failed to pick image: $e')),
-        );
+        ); */
+        errorSnackbarwidget.show(context, 'Failed to pick image: $e');
         return null;
       }
     } else if (status.isDenied) {
       print('5. Permission denied');
-      ScaffoldMessenger.of(context).showSnackBar(
+      /*  ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: const Text(
               'Photo library access is required. Please enable it in settings.'),
@@ -150,11 +157,13 @@ class _InventoryScreenState extends State<InventoryScreen> {
             },
           ),
         ),
-      );
+      ); */
+      errorSnackbarwidget.show(context,
+          'Photo library access is required. Please enable it in settings.');
       return null;
     } else if (status.isPermanentlyDenied) {
       print('5. Permission permanently denied');
-      ScaffoldMessenger.of(context).showSnackBar(
+      /* ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: const Text(
               'Photo library access is permanently denied. Please enable it in settings.'),
@@ -166,16 +175,21 @@ class _InventoryScreenState extends State<InventoryScreen> {
             },
           ),
         ),
-      );
+      ); */
+
+      errorSnackbarwidget.show(context,
+          'Photo library access is permanently denied. Please enable it in settings.');
       return null;
     } else if (status.isRestricted || status.isLimited) {
       print('5. Permission restricted or limited');
-      ScaffoldMessenger.of(context).showSnackBar(
+      /*  ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
               'Photo library access is restricted or limited by device settings.'),
         ),
-      );
+      ); */
+      errorSnackbarwidget.show(context,
+          'Photo library access is restricted or limited by device settings.');
       return null;
     }
     print('5. Unexpected permission status: $status');
@@ -188,9 +202,10 @@ class _InventoryScreenState extends State<InventoryScreen> {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
       print('No user logged in');
-      ScaffoldMessenger.of(context).showSnackBar(
+      /*  ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please sign in to add items')),
-      );
+      ); */
+      errorSnackbarwidget.show(context, 'Please sign in to add items');
       return;
     }
     final item = RentalItem(
@@ -213,9 +228,10 @@ class _InventoryScreenState extends State<InventoryScreen> {
       print('Item added to Firestore: ${item.name}');
     } catch (e) {
       print('Error adding item to Firestore: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
+      /*  ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error adding item: $e')),
-      );
+      ); */
+      errorSnackbarwidget.show(context, 'Error adding item: $e');
     }
   }
 
@@ -493,11 +509,13 @@ class _InventoryScreenState extends State<InventoryScreen> {
                               });
                               if (image != null) {
                                 print('F. Showing success snackbar');
-                                ScaffoldMessenger.of(context).showSnackBar(
+                                /*  ScaffoldMessenger.of(context).showSnackBar(
                                   const SnackBar(
                                       content:
                                           Text('Image selected successfully')),
-                                );
+                                ); */
+                                Snackbarwidget.show(
+                                    context, 'Image selected successfully');
                               }
                             },
                       child: Text(isPickingImage
@@ -543,9 +561,11 @@ class _InventoryScreenState extends State<InventoryScreen> {
                         priceController.text.trim().isEmpty ||
                         categoryController.text.trim().isEmpty) {
                       print('Validation failed: empty fields');
-                      ScaffoldMessenger.of(context).showSnackBar(
+                      /*   ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(content: Text('Please fill all fields')),
-                      );
+                      ); */
+                      errorSnackbarwidget.show(
+                          context, 'Please fill all fields');
                       return;
                     }
 
@@ -560,10 +580,12 @@ class _InventoryScreenState extends State<InventoryScreen> {
                             await _uploadImageToCloudinary(_selectedImage!);
                         if (imageUrl == null) {
                           print('Image upload failed');
-                          ScaffoldMessenger.of(context).showSnackBar(
+                          /*  ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
                                 content: Text('Failed to upload image')),
-                          );
+                          ); */
+                          errorSnackbarwidget.show(
+                              context, 'Failed to upload image');
                           return;
                         }
                         print('Image uploaded, URL: $imageUrl');
@@ -581,16 +603,22 @@ class _InventoryScreenState extends State<InventoryScreen> {
                         _selectedImage = null;
                       });
                       Navigator.of(context).pop();
-                      ScaffoldMessenger.of(context).showSnackBar(
+                      /*  ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
                             content:
                                 Text('${nameController.text.trim()} added!')),
-                      );
+                      ); */
+                      /*  Snackbarwidget.show(
+                          context, '${nameController.text.trim()} added!'); */
+                      Snackbarwidget.show(
+                          context, '${nameController.text.trim()} added!');
                     } catch (e) {
                       print('Error in add item process: $e');
-                      ScaffoldMessenger.of(context).showSnackBar(
+                      /*   ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(content: Text('Error adding item: $e')),
-                      );
+                      ); */
+                      errorSnackbarwidget.show(
+                          context, 'Error adding item: $e');
                     }
                   },
                 ),

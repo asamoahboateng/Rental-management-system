@@ -7,6 +7,7 @@ import 'package:intl/intl.dart';
 import 'package:rental_system/modals/rental.dart';
 import 'package:rental_system/modals/clients.dart';
 import 'package:rental_system/modals/rental_item.dart';
+import 'package:rental_system/utils/snackbar.dart';
 
 class AddRentalScreen extends StatefulWidget {
   const AddRentalScreen({super.key});
@@ -223,9 +224,10 @@ class _AddRentalScreenState extends State<AddRentalScreen> {
             .toList();
       });
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      /*  ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error loading clients: $e')),
-      );
+      ); */
+      errorSnackbarwidget.show(context, 'Error loading clients: $e');
     }
   }
 
@@ -244,9 +246,10 @@ class _AddRentalScreenState extends State<AddRentalScreen> {
             .toList();
       });
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      /*   ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error loading items: $e')),
-      );
+      ); */
+      errorSnackbarwidget.show(context, 'Error loading items: $e');
     }
   }
 
@@ -566,30 +569,34 @@ class _AddRentalScreenState extends State<AddRentalScreen> {
 
   Future<void> _submitRental() async {
     if (_formKey.currentState == null || !_formKey.currentState!.validate()) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      /*  ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please fill all required fields')),
-      );
+      ); */
+      errorSnackbarwidget.show(context, 'Please fill all required fields');
       return;
     }
 
     if (_selectedClient == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      /*  ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please select a client')),
-      );
+      ); */
+      errorSnackbarwidget.show(context, 'Please select a client');
       return;
     }
 
     if (_selectedQuantities.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      /*  ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please select at least one item')),
-      );
+      ); */
+      errorSnackbarwidget.show(context, 'Please select at least one item');
       return;
     }
 
     if (_endDate.isBefore(_startDate)) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      /*  ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('End date cannot be before start date')),
-      );
+      ); */
+      errorSnackbarwidget.show(context, 'End date cannot be before start date');
       return;
     }
 
@@ -662,10 +669,11 @@ class _AddRentalScreenState extends State<AddRentalScreen> {
       // Commit the batch
       await batch.commit();
 
-      ScaffoldMessenger.of(context).showSnackBar(
+      /*    ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Rental created successfully!')),
       );
-
+ */
+      Snackbarwidget.show(context, 'Rental created successfully!');
       // Clear form and reset state
       setState(() {
         _selectedClient = null;
@@ -681,9 +689,11 @@ class _AddRentalScreenState extends State<AddRentalScreen> {
       // Navigate back to RentalsScreen
       Navigator.pop(context);
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      /*   ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error creating rental: $e')),
-      );
+      ); */
+
+      errorSnackbarwidget.show(context, 'Error creating rental: $e');
     } finally {
       setState(() => _isSubmitting = false);
     }
