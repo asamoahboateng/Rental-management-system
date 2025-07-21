@@ -1,5 +1,11 @@
+import 'dart:async';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:rental_system/modals/clients.dart';
 import 'package:rental_system/modals/rental.dart';
+import 'package:rental_system/modals/rental_item.dart';
+import 'package:rental_system/screens/add_rentals.dart';
 
 class RentalsScreen extends StatefulWidget {
   const RentalsScreen({super.key});
@@ -8,119 +14,166 @@ class RentalsScreen extends StatefulWidget {
   State<RentalsScreen> createState() => _RentalsScreenState();
 }
 
-class _RentalsScreenState extends State<RentalsScreen> {
+class _RentalsScreenState extends State<RentalsScreen>
+    with TickerProviderStateMixin {
   final TextEditingController _searchController = TextEditingController();
-  final List<Rental> _rentals = [
-    Rental(
-      id: '1',
-      clientName: 'John Doe',
-      itemName: 'Chiavari Chairs',
-      quantity: 50,
-      startDate: DateTime.now().subtract(const Duration(days: 2)),
-      endDate: DateTime.now().add(const Duration(days: 3)),
-      totalAmount: 'GHC 250',
-      status: RentalStatus.active,
-      clientPhone: '+233 24 123 4567',
-    ),
-    Rental(
-      id: '2',
-      clientName: 'Jane Smith',
-      itemName: 'Round Tables',
-      quantity: 10,
-      startDate: DateTime.now().subtract(const Duration(days: 5)),
-      endDate: DateTime.now().subtract(const Duration(days: 1)),
-      totalAmount: 'GHC 100',
-      status: RentalStatus.completed,
-      clientPhone: '+233 20 987 6543',
-    ),
-    Rental(
-      id: '3',
-      clientName: 'Michael Johnson',
-      itemName: 'Sound System',
-      quantity: 2,
-      startDate: DateTime.now().add(const Duration(days: 1)),
-      endDate: DateTime.now().add(const Duration(days: 4)),
-      totalAmount: 'GHC 200',
-      status: RentalStatus.upcoming,
-      clientPhone: '+233 26 555 0123',
-    ),
-    Rental(
-      id: '4',
-      clientName: 'Sarah Wilson',
-      itemName: 'Plates',
-      quantity: 100,
-      startDate: DateTime.now().subtract(const Duration(days: 1)),
-      endDate: DateTime.now().add(const Duration(days: 2)),
-      totalAmount: 'GHC 100',
-      status: RentalStatus.active,
-      clientPhone: '+233 27 444 5678',
-    ),
-    Rental(
-      id: '5',
-      clientName: 'David Brown',
-      itemName: 'Chafing Dish',
-      quantity: 5,
-      startDate: DateTime.now().subtract(const Duration(days: 10)),
-      endDate: DateTime.now().subtract(const Duration(days: 8)),
-      totalAmount: 'GHC 75',
-      status: RentalStatus.overdue,
-      clientPhone: '+233 24 111 2222',
-    ),
-  ];
-
+  final FocusNode _searchFocusNode = FocusNode();
   List<Rental> _filteredRentals = [];
+  List<Rental> _allRentals = [];
   RentalStatus? _statusFilter;
+  String _lastSearchQuery = '';
+  RentalStatus? _lastStatusFilter;
+  Timer? _debounce;
+  final GlobalKey<ScaffoldMessengerState> _scaffoldMessengerKey =
+      GlobalKey<ScaffoldMessengerState>();
 
   @override
   void initState() {
     super.initState();
-    _filteredRentals = List.from(_rentals);
-    _searchController.addListener(_filterRentals);
+    _filteredRentals = [];
+    _allRentals = [];
+    _searchController.addListener(_onSearchChanged);
+    _searchFocusNode.addListener(() {
+      print('Search TextField focus changed: ${_searchFocusNode.hasFocus}');
+    });
   }
 
   @override
   void dispose() {
-    _searchController.removeListener(_filterRentals);
+    _searchController.removeListener(_onSearchChanged);
     _searchController.dispose();
+    _searchFocusNode.dispose();
+    _debounce?.cancel();
     super.dispose();
   }
 
-  void _filterRentals() {
+  void _onSearchChanged() {
     final query = _searchController.text.trim().toLowerCase();
-    setState(() {
-      _filteredRentals = _rentals.where((rental) {
-        final matchesSearch = rental.clientName.toLowerCase().contains(query) ||
-            rental.itemName.toLowerCase().contains(query);
-        final matchesStatus =
-            _statusFilter == null || rental.status == _statusFilter;
-        return matchesSearch && matchesStatus;
-      }).toList();
+    if (_debounce?.isActive ?? false) _debounce!.cancel();
+    // Only update if query or filter has changed
+    if (query != _lastSearchQuery || _statusFilter != _lastStatusFilter) {
+      _debounce = Timer(const Duration(milliseconds: 600), () {
+        setState(() {
+          _lastSearchQuery = query;
+          _lastStatusFilter = _statusFilter;
+          _filteredRentals = _allRentals.where((rental) {
+            final matchesSearch = query.isEmpty ||
+                rental.clientId.toLowerCase().contains(query) ||
+                rental.itemId.toLowerCase().contains(query);
+            final matchesStatus =
+                _statusFilter == null || rental.status == _statusFilter;
+            return matchesSearch && matchesStatus;
+          }).toList();
+        });
+        print(
+            'Search query: "$query", status filter: ${_statusFilter?.name ?? 'All'}, filtered rentals: ${_filteredRentals.length}');
+      });
+    }
+  }
+
+  void _showAnimatedSnackBar(SnackBar snackBar) {
+    print('Showing animated snackbar: ${snackBar.content}');
+    final controller = AnimationController(
+      duration: const Duration(milliseconds: 300),
+      vsync: this,
+    );
+    final animation = Tween<Offset>(
+      begin: const Offset(0, 1),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(
+      parent: controller,
+      curve: Curves.easeOutCubic,
+    ));
+
+    final snackBarKey = GlobalKey();
+    final snackBarWidget = SlideTransition(
+      position: animation,
+      child: Container(
+        key: snackBarKey,
+        child: snackBar,
+      ),
+    );
+
+    _scaffoldMessengerKey.currentState?.showSnackBar(
+      SnackBar(
+        content: snackBarWidget,
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        behavior: SnackBarBehavior.floating,
+        duration: snackBar.duration,
+        margin: EdgeInsets.zero,
+        padding: EdgeInsets.zero,
+      ),
+    );
+
+    controller.forward().then((_) {
+      print('Snackbar animation completed');
+      Future.delayed(snackBar.duration, () {
+        controller.reverse().then((_) {
+          print('Snackbar dismissed');
+          controller.dispose();
+        });
+      });
     });
   }
 
-  void _addRental(String clientName, String clientPhone, String itemName,
-      int quantity, DateTime startDate, DateTime endDate, String totalAmount) {
-    setState(() {
-      _rentals.add(Rental(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
-        clientName: clientName,
-        clientPhone: clientPhone,
-        itemName: itemName,
-        quantity: quantity,
-        startDate: startDate,
-        endDate: endDate,
-        totalAmount: totalAmount,
-        status: startDate.isAfter(DateTime.now())
-            ? RentalStatus.upcoming
-            : RentalStatus.active,
-      ));
-      _filterRentals();
-    });
+  Future<void> _markAsReturned(Rental rental) async {
+    try {
+      final batch = FirebaseFirestore.instance.batch();
+      final rentalRef =
+          FirebaseFirestore.instance.collection('rentals').doc(rental.id);
+      final itemRef = FirebaseFirestore.instance
+          .collection('rental_items')
+          .doc(rental.itemId);
+
+      // Update rental status to completed
+      batch.update(rentalRef, {'status': RentalStatus.completed.name});
+
+      // Increment availableQuantity in rental_items
+      final itemDoc = await itemRef.get();
+      if (itemDoc.exists) {
+        final item = RentalItem.fromMap(itemDoc.data()!);
+        batch.update(itemRef, {
+          'availableQuantity': item.availableQuantity + rental.quantity,
+        });
+      } else {
+        throw Exception('Item ${rental.itemId} not found');
+      }
+
+      await batch.commit();
+      _showAnimatedSnackBar(
+        const SnackBar(content: Text('Rental marked as returned')),
+      );
+      print(
+          'Rental ${rental.id} marked as returned, updated item ${rental.itemId}');
+    } catch (e) {
+      _showAnimatedSnackBar(
+        SnackBar(content: Text('Error marking rental as returned: $e')),
+      );
+      print('Error marking rental ${rental.id} as returned: $e');
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final user = FirebaseAuth.instance.currentUser;
+
+    if (user == null) {
+      return Scaffold(
+        body: Center(
+          child: TextButton(
+            onPressed: () {
+              print('Navigating to login screen');
+              Navigator.pushNamed(context, '/login');
+            },
+            child: const Text('Please sign in to view rentals'),
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
+      key: _scaffoldMessengerKey,
       backgroundColor: Colors.grey[50],
       appBar: AppBar(
         backgroundColor: Colors.blue.shade900,
@@ -140,8 +193,9 @@ class _RentalsScreenState extends State<RentalsScreen> {
             onSelected: (status) {
               setState(() {
                 _statusFilter = status;
-                _filterRentals();
+                _onSearchChanged();
               });
+              print('Status filter set to: ${status?.name ?? 'All'}');
             },
             itemBuilder: (context) => [
               const PopupMenuItem(value: null, child: Text('All Rentals')),
@@ -159,325 +213,297 @@ class _RentalsScreenState extends State<RentalsScreen> {
       ),
       floatingActionButton: FloatingActionButton(
         backgroundColor: Colors.blue[900],
-        onPressed: () => _showAddRentalDialog(context),
+        onPressed: () {
+          print('Navigating to AddRentalScreen');
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const AddRentalScreen()),
+          );
+        },
         child: const Icon(Icons.add, color: Colors.white),
         tooltip: 'Add New Rental',
       ),
-      body: Column(
-        children: [
-          // Search Bar
-          Container(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
-            color: Colors.blue.shade900,
-            child: TextField(
-              controller: _searchController,
-              decoration: InputDecoration(
-                hintText: 'Search rentals...',
-                hintStyle: TextStyle(color: Colors.grey[400]),
-                prefixIcon: Icon(Icons.search, color: Colors.grey[400]),
-                suffixIcon: _searchController.text.isNotEmpty
-                    ? IconButton(
-                        icon: Icon(Icons.clear, color: Colors.grey[400]),
-                        onPressed: () {
-                          _searchController.clear();
-                          _filterRentals();
-                        },
-                      )
-                    : null,
-                filled: true,
-                fillColor: Colors.white,
-                contentPadding: const EdgeInsets.symmetric(
-                    vertical: 15.0, horizontal: 20.0),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(30.0),
-                  borderSide: BorderSide.none,
+      body: StreamBuilder<QuerySnapshot>(
+        stream: FirebaseFirestore.instance
+            .collection('rentals')
+            .where('userId', isEqualTo: user.uid)
+            .snapshots(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (snapshot.hasError) {
+            print('Firestore stream error: ${snapshot.error}');
+            return const Center(child: Text('Error loading rentals'));
+          }
+          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+            return const Center(child: Text('No rentals found'));
+          }
+
+          _allRentals = snapshot.data!.docs
+              .map((doc) {
+                final data = doc.data() as Map<String, dynamic>;
+                data['id'] = doc.id; // Ensure ID is included
+                try {
+                  return Rental.fromMap(data);
+                } catch (e) {
+                  print('Error parsing Firestore rental: $e, data: $data');
+                  return null;
+                }
+              })
+              .where((rental) => rental != null)
+              .cast<Rental>()
+              .toList();
+
+          // Update filtered rentals only if necessary
+          if (_searchController.text.isEmpty && _statusFilter == null) {
+            _filteredRentals = _allRentals;
+          } else {
+            _onSearchChanged();
+          }
+
+          return Column(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 16.0, vertical: 12.0),
+                color: Colors.blue.shade900,
+                child: TextField(
+                  key: const ValueKey('searchRentalTextField'),
+                  controller: _searchController,
+                  focusNode: _searchFocusNode,
+                  decoration: InputDecoration(
+                    hintText: 'Search rentals...',
+                    hintStyle: TextStyle(color: Colors.grey[400]),
+                    prefixIcon: Icon(Icons.search, color: Colors.grey[400]),
+                    suffixIcon: _searchController.text.isNotEmpty
+                        ? IconButton(
+                            icon: Icon(Icons.clear, color: Colors.grey[400]),
+                            onPressed: () {
+                              _searchController.clear();
+                              _searchFocusNode.requestFocus();
+                              setState(() {
+                                _filteredRentals = _allRentals;
+                                _lastSearchQuery = '';
+                              });
+                              print(
+                                  'Cleared search, reset to ${_filteredRentals.length} rentals');
+                            },
+                          )
+                        : null,
+                    filled: true,
+                    fillColor: Colors.white,
+                    contentPadding: const EdgeInsets.symmetric(
+                        vertical: 15.0, horizontal: 20.0),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(30.0),
+                      borderSide: BorderSide.none,
+                    ),
+                  ),
                 ),
               ),
-            ),
-          ),
-          // Stats
-          Container(
-            padding: const EdgeInsets.all(16.0),
-            child: Row(
-              children: [
-                Expanded(
-                  child: _StatsCard(
-                    title: 'Active',
-                    value: _rentals
-                        .where((r) => r.status == RentalStatus.active)
-                        .length
-                        .toString(),
-                    icon: Icons.play_circle,
-                    color: Colors.green,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: _StatsCard(
-                    title: 'Upcoming',
-                    value: _rentals
-                        .where((r) => r.status == RentalStatus.upcoming)
-                        .length
-                        .toString(),
-                    icon: Icons.schedule,
-                    color: Colors.blue,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: _StatsCard(
-                    title: 'Completed',
-                    value: _rentals
-                        .where((r) => r.status == RentalStatus.completed)
-                        .length
-                        .toString(),
-                    icon: Icons.check_circle,
-                    color: Colors.grey,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: _StatsCard(
-                    title: 'Overdue',
-                    value: _rentals
-                        .where((r) => r.status == RentalStatus.overdue)
-                        .length
-                        .toString(),
-                    icon: Icons.warning,
-                    color: Colors.red,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          // Rentals List
-          Expanded(
-            child: _filteredRentals.isEmpty
-                ? const Center(
-                    child: Text(
-                      'No rentals found',
-                      style: TextStyle(fontSize: 16, color: Colors.grey),
-                    ),
-                  )
-                : ListView.builder(
-                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                    itemCount: _filteredRentals.length,
-                    itemBuilder: (context, index) {
-                      final rental = _filteredRentals[index];
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 12.0),
-                        child: _RentalCard(
-                          rental: rental,
-                          onTap: () =>
-                              _showRentalDetailsDialog(context, rental),
-                        ),
-                      );
-                    },
-                  ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showAddRentalDialog(BuildContext context) {
-    final clientNameController = TextEditingController();
-    final clientPhoneController = TextEditingController();
-    final itemNameController = TextEditingController();
-    final quantityController = TextEditingController();
-    final totalAmountController = TextEditingController();
-    DateTime startDate = DateTime.now();
-    DateTime endDate = DateTime.now().add(const Duration(days: 1));
-
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return StatefulBuilder(
-          builder: (context, setState) {
-            return AlertDialog(
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(15.0)),
-              title: const Text('Add New Rental'),
-              content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
+              Container(
+                padding: const EdgeInsets.all(16.0),
+                child: Row(
                   children: [
-                    TextField(
-                      controller: clientNameController,
-                      decoration: const InputDecoration(
-                        labelText: 'Client Name',
-                        border: OutlineInputBorder(),
+                    Expanded(
+                      child: _StatsCard(
+                        title: 'Active',
+                        value: _allRentals
+                            .where((r) => r.status == RentalStatus.active)
+                            .length
+                            .toString(),
+                        icon: Icons.play_circle,
+                        color: Colors.green,
                       ),
                     ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: clientPhoneController,
-                      decoration: const InputDecoration(
-                        labelText: 'Client Phone',
-                        border: OutlineInputBorder(),
-                      ),
-                      keyboardType: TextInputType.phone,
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: itemNameController,
-                      decoration: const InputDecoration(
-                        labelText: 'Item Name',
-                        border: OutlineInputBorder(),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _StatsCard(
+                        title: 'Upcoming',
+                        value: _allRentals
+                            .where((r) => r.status == RentalStatus.upcoming)
+                            .length
+                            .toString(),
+                        icon: Icons.schedule,
+                        color: Colors.blue,
                       ),
                     ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: quantityController,
-                      decoration: const InputDecoration(
-                        labelText: 'Quantity',
-                        border: OutlineInputBorder(),
-                      ),
-                      keyboardType: TextInputType.number,
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: totalAmountController,
-                      decoration: const InputDecoration(
-                        labelText: 'Total Amount (e.g., GHC 100)',
-                        border: OutlineInputBorder(),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _StatsCard(
+                        title: 'Completed',
+                        value: _allRentals
+                            .where((r) => r.status == RentalStatus.completed)
+                            .length
+                            .toString(),
+                        icon: Icons.check_circle,
+                        color: Colors.grey,
                       ),
                     ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextButton(
-                            onPressed: () async {
-                              final date = await showDatePicker(
-                                context: context,
-                                initialDate: startDate,
-                                firstDate: DateTime.now(),
-                                lastDate: DateTime.now()
-                                    .add(const Duration(days: 365)),
-                              );
-                              if (date != null) {
-                                setState(() {
-                                  startDate = date;
-                                });
-                              }
-                            },
-                            child: Text(
-                                'Start: ${startDate.day}/${startDate.month}/${startDate.year}'),
-                          ),
-                        ),
-                        Expanded(
-                          child: TextButton(
-                            onPressed: () async {
-                              final date = await showDatePicker(
-                                context: context,
-                                initialDate: endDate,
-                                firstDate: startDate,
-                                lastDate: DateTime.now()
-                                    .add(const Duration(days: 365)),
-                              );
-                              if (date != null) {
-                                setState(() {
-                                  endDate = date;
-                                });
-                              }
-                            },
-                            child: Text(
-                                'End: ${endDate.day}/${endDate.month}/${endDate.year}'),
-                          ),
-                        ),
-                      ],
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _StatsCard(
+                        title: 'Overdue',
+                        value: _allRentals
+                            .where((r) => r.status == RentalStatus.overdue)
+                            .length
+                            .toString(),
+                        icon: Icons.warning,
+                        color: Colors.red,
+                      ),
                     ),
                   ],
                 ),
               ),
-              actions: [
-                TextButton(
-                  child: const Text('Cancel'),
-                  onPressed: () => Navigator.of(context).pop(),
-                ),
-                TextButton(
-                  child: Text('Add', style: TextStyle(color: Colors.blue[900])),
-                  onPressed: () {
-                    if (clientNameController.text.trim().isEmpty ||
-                        clientPhoneController.text.trim().isEmpty ||
-                        itemNameController.text.trim().isEmpty ||
-                        quantityController.text.trim().isEmpty ||
-                        totalAmountController.text.trim().isEmpty) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Please fill all fields')),
-                      );
-                      return;
-                    }
-                    try {
-                      final quantity =
-                          int.parse(quantityController.text.trim());
-                      _addRental(
-                        clientNameController.text.trim(),
-                        clientPhoneController.text.trim(),
-                        itemNameController.text.trim(),
-                        quantity,
-                        startDate,
-                        endDate,
-                        totalAmountController.text.trim(),
-                      );
-                      Navigator.of(context).pop();
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                            content: Text('Rental added successfully!')),
-                      );
-                    } catch (e) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                            content: Text('Invalid quantity format')),
-                      );
-                    }
-                  },
-                ),
-              ],
-            );
-          },
-        );
-      },
+              Expanded(
+                child: _filteredRentals.isEmpty
+                    ? const Center(
+                        child: Text(
+                          'No rentals found',
+                          style: TextStyle(fontSize: 16, color: Colors.grey),
+                        ),
+                      )
+                    : ListView.builder(
+                        padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                        itemCount: _filteredRentals.length,
+                        itemBuilder: (context, index) {
+                          final rental = _filteredRentals[index];
+                          return FutureBuilder<Map<String, dynamic>>(
+                            future: _fetchRentalDetails(rental),
+                            builder: (context, snapshot) {
+                              if (snapshot.connectionState ==
+                                  ConnectionState.waiting) {
+                                return const Padding(
+                                  padding: EdgeInsets.only(bottom: 12.0),
+                                  child: CircularProgressIndicator(),
+                                );
+                              }
+                              if (snapshot.hasError || !snapshot.hasData) {
+                                print(
+                                    'Error fetching rental details: ${snapshot.error}');
+                                return const SizedBox.shrink();
+                              }
+                              final details = snapshot.data!;
+                              final clientName =
+                                  details['clientName'] as String;
+                              final itemName = details['itemName'] as String;
+                              final clientPhone =
+                                  details['clientPhone'] as String;
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 12.0),
+                                child: _RentalCard(
+                                  rental: rental,
+                                  clientName: clientName,
+                                  itemName: itemName,
+                                  clientPhone: clientPhone,
+                                  onTap: () => _showRentalDetailsDialog(
+                                      context,
+                                      rental,
+                                      clientName,
+                                      itemName,
+                                      clientPhone),
+                                ),
+                              );
+                            },
+                          );
+                        },
+                      ),
+              ),
+            ],
+          );
+        },
+      ),
     );
   }
 
-  void _showRentalDetailsDialog(BuildContext context, Rental rental) {
+  Future<Map<String, dynamic>> _fetchRentalDetails(Rental rental) async {
+    try {
+      final clientDoc = await FirebaseFirestore.instance
+          .collection('clients')
+          .doc(rental.clientId)
+          .get();
+      final itemDoc = await FirebaseFirestore.instance
+          .collection('rental_items')
+          .doc(rental.itemId)
+          .get();
+      final client =
+          clientDoc.exists ? Client.fromMap(clientDoc.data()!) : null;
+      final item = itemDoc.exists ? RentalItem.fromMap(itemDoc.data()!) : null;
+      print(
+          'Fetched details for rental ${rental.id}: client=${client?.name}, item=${item?.name}');
+      return {
+        'clientName': client?.name ?? 'Unknown Client',
+        'clientPhone': client?.phone ?? 'Unknown Phone',
+        'itemName': item?.name ?? 'Unknown Item',
+      };
+    } catch (e) {
+      print('Error fetching rental details for ${rental.id}: $e');
+      return {
+        'clientName': 'Unknown Client',
+        'clientPhone': 'Unknown Phone',
+        'itemName': 'Unknown Item',
+      };
+    }
+  }
+
+  void _showRentalDetailsDialog(BuildContext context, Rental rental,
+      String clientName, String itemName, String clientPhone) {
+    print('Opening rental details dialog for: ${rental.id}');
     showDialog(
       context: context,
-      builder: (BuildContext context) {
+      builder: (BuildContext dialogContext) {
         return AlertDialog(
           shape:
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(15.0)),
           title: Text('Rental #${rental.id}'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Client: ${rental.clientName}'),
-              const SizedBox(height: 8),
-              Text('Phone: ${rental.clientPhone}'),
-              const SizedBox(height: 8),
-              Text('Item: ${rental.itemName}'),
-              const SizedBox(height: 8),
-              Text('Quantity: ${rental.quantity}'),
-              const SizedBox(height: 8),
-              Text(
-                  'Start Date: ${rental.startDate.day}/${rental.startDate.month}/${rental.startDate.year}'),
-              const SizedBox(height: 8),
-              Text(
-                  'End Date: ${rental.endDate.day}/${rental.endDate.month}/${rental.endDate.year}'),
-              const SizedBox(height: 8),
-              Text('Total Amount: ${rental.totalAmount}'),
-              const SizedBox(height: 8),
-              Text('Status: ${rental.status.name.toUpperCase()}'),
-            ],
+          content: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(dialogContext).size.height * 0.6,
+              maxWidth: MediaQuery.of(dialogContext).size.width * 0.8,
+            ),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Client: $clientName'),
+                  const SizedBox(height: 8),
+                  Text('Phone: $clientPhone'),
+                  const SizedBox(height: 8),
+                  Text('Item: $itemName'),
+                  const SizedBox(height: 8),
+                  Text('Quantity: ${rental.quantity}'),
+                  const SizedBox(height: 8),
+                  Text(
+                      'Start Date: ${rental.startDate.day}/${rental.startDate.month}/${rental.startDate.year}'),
+                  const SizedBox(height: 8),
+                  Text(
+                      'End Date: ${rental.endDate.day}/${rental.endDate.month}/${rental.endDate.year}'),
+                  const SizedBox(height: 8),
+                  Text('Total Amount: \$${rental.totalAmount}'),
+                  const SizedBox(height: 8),
+                  Text('Status: ${rental.status.name.toUpperCase()}'),
+                ],
+              ),
+            ),
           ),
           actions: [
+            if (rental.status != RentalStatus.completed &&
+                rental.status != RentalStatus.overdue)
+              TextButton(
+                child: const Text('Mark as Returned'),
+                onPressed: () {
+                  Navigator.of(dialogContext).pop();
+                  _markAsReturned(rental);
+                },
+              ),
             TextButton(
               child: const Text('Close'),
-              onPressed: () => Navigator.of(context).pop(),
+              onPressed: () {
+                print('Closing rental details dialog');
+                Navigator.of(dialogContext).pop();
+              },
             ),
           ],
         );
@@ -534,10 +560,16 @@ class _StatsCard extends StatelessWidget {
 
 class _RentalCard extends StatelessWidget {
   final Rental rental;
+  final String clientName;
+  final String itemName;
+  final String clientPhone;
   final VoidCallback onTap;
 
   const _RentalCard({
     required this.rental,
+    required this.clientName,
+    required this.itemName,
+    required this.clientPhone,
     required this.onTap,
   });
 
@@ -575,7 +607,7 @@ class _RentalCard extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    rental.clientName,
+                    clientName,
                     style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
@@ -602,7 +634,7 @@ class _RentalCard extends StatelessWidget {
               ),
               const SizedBox(height: 8),
               Text(
-                rental.itemName,
+                itemName,
                 style: TextStyle(
                   fontSize: 14,
                   color: Colors.blue[900],
@@ -629,7 +661,7 @@ class _RentalCard extends StatelessWidget {
                   ),
                   const Spacer(),
                   Text(
-                    rental.totalAmount,
+                    '\$${rental.totalAmount}',
                     style: const TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.bold,

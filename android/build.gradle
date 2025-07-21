@@ -4,7 +4,7 @@ buildscript {
         mavenCentral()
     }
     dependencies {
-        classpath 'com.android.tools.build:gradle:8.0.0'  // or your version
+        classpath 'com.android.tools.build:gradle:8.3.0'  // or your version
         classpath 'com.google.gms:google-services:4.4.0'  // ✅ Required for Firebase
     }
 }
