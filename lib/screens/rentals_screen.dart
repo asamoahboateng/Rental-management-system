@@ -202,8 +202,6 @@ class _RentalsScreenState extends State<RentalsScreen>
               const PopupMenuItem(
                   value: RentalStatus.active, child: Text('Active')),
               const PopupMenuItem(
-                  value: RentalStatus.upcoming, child: Text('Upcoming')),
-              const PopupMenuItem(
                   value: RentalStatus.completed, child: Text('Completed')),
               const PopupMenuItem(
                   value: RentalStatus.overdue, child: Text('Overdue')),
@@ -318,7 +316,7 @@ class _RentalsScreenState extends State<RentalsScreen>
                       ),
                     ),
                     const SizedBox(width: 8),
-                    Expanded(
+                    /*   Expanded(
                       child: _StatsCard(
                         title: 'Upcoming',
                         value: _allRentals
@@ -328,7 +326,7 @@ class _RentalsScreenState extends State<RentalsScreen>
                         icon: Icons.schedule,
                         color: Colors.blue,
                       ),
-                    ),
+                    ), */
                     const SizedBox(width: 8),
                     Expanded(
                       child: _StatsCard(
@@ -456,7 +454,7 @@ class _RentalsScreenState extends State<RentalsScreen>
         return AlertDialog(
           shape:
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(15.0)),
-          title: Text('Rental #${rental.id}'),
+          title: Text('Rental Details'),
           content: ConstrainedBox(
             constraints: BoxConstraints(
               maxHeight: MediaQuery.of(dialogContext).size.height * 0.6,

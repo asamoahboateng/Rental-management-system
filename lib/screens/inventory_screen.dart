@@ -11,6 +11,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:rental_system/modals/rental_item.dart';
 import 'package:rental_system/utils/snackbar.dart';
+import 'dart:async';
 
 class InventoryScreen extends StatefulWidget {
   const InventoryScreen({super.key});
@@ -21,25 +22,46 @@ class InventoryScreen extends StatefulWidget {
 class _InventoryScreenState extends State<InventoryScreen> {
   final TextEditingController _searchController = TextEditingController();
   List<RentalItem> _filteredItems = [];
+  List<RentalItem> _allItems = [];
   String _sortBy = 'name';
   XFile? _selectedImage;
   final ImagePicker _picker = ImagePicker();
+  Timer? _debounce;
+
   @override
   void initState() {
     super.initState();
     _filteredItems = [];
-    _searchController.addListener(_filterAndSortItems);
+    _allItems = [];
+    // Debounce search input to prevent excessive rebuilds
+    _searchController.addListener(_onSearchChanged);
   }
 
   @override
   void dispose() {
-    _searchController.removeListener(_filterAndSortItems);
+    _searchController.removeListener(_onSearchChanged);
     _searchController.dispose();
+    _debounce?.cancel();
     super.dispose();
   }
 
+  void _onSearchChanged() {
+    // Cancel previous debounce timer
+    if (_debounce?.isActive ?? false) _debounce!.cancel();
+    // Set new debounce timer for 500ms
+    _debounce = Timer(const Duration(milliseconds: 500), () {
+      setState(() {
+        _filterAndSortItems();
+      });
+    });
+  }
+
   void _filterAndSortItems() {
+    final query = _searchController.text.trim().toLowerCase();
     setState(() {
+      _filteredItems = _allItems
+          .where((item) => item.name.toLowerCase().contains(query))
+          .toList();
       _sortItems();
     });
   }
@@ -58,7 +80,6 @@ class _InventoryScreenState extends State<InventoryScreen> {
 
   Future<String?> _uploadImageToCloudinary(XFile image) async {
     print('Starting Cloudinary upload for image: ${image.path}');
-
     final apiKey = dotenv.env['CLOUDINARY_API_KEY']!;
     final apiSecret = dotenv.env['CLOUDINARY_API_SECRET']!;
     final cloudName = dotenv.env['CLOUDINARY_CLOUD_NAME']!;
@@ -93,9 +114,52 @@ class _InventoryScreenState extends State<InventoryScreen> {
     }
   }
 
+  Future<bool> _deleteImageFromCloudinary(String imageUrl) async {
+    print('Deleting image from Cloudinary: $imageUrl');
+    final apiKey = dotenv.env['CLOUDINARY_API_KEY']!;
+    final apiSecret = dotenv.env['CLOUDINARY_API_SECRET']!;
+    final cloudName = dotenv.env['CLOUDINARY_CLOUD_NAME']!;
+
+    // Extract public_id from imageUrl (e.g., https://res.cloudinary.com/<cloud_name>/image/upload/v1234567890/<public_id>.jpg)
+    final uriSegments = Uri.parse(imageUrl).pathSegments;
+    final publicId =
+        uriSegments.isNotEmpty ? uriSegments.last.split('.').first : null;
+    if (publicId == null) {
+      print('Invalid image URL, cannot extract public_id');
+      return false;
+    }
+
+    final timestamp = DateTime.now().millisecondsSinceEpoch.toString();
+    final signature = sha1
+        .convert(
+            utf8.encode('public_id=$publicId&timestamp=$timestamp$apiSecret'))
+        .toString();
+
+    final uri =
+        Uri.parse('https://api.cloudinary.com/v1_1/$cloudName/image/destroy');
+    final response = await http.post(
+      uri,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'public_id': publicId,
+        'api_key': apiKey,
+        'timestamp': timestamp,
+        'signature': signature,
+      }),
+    );
+
+    print('Cloudinary delete response status: ${response.statusCode}');
+    if (response.statusCode == 200) {
+      print('Image deleted successfully from Cloudinary');
+      return true;
+    } else {
+      print('Failed to delete image from Cloudinary: ${response.body}');
+      return false;
+    }
+  }
+
   Future<XFile?> _pickImage() async {
-    print(
-        '1. Entering _pickImage function'); // Check platform-specific permissions
+    print('1. Entering _pickImage function');
     PermissionStatus status;
     if (Platform.isAndroid) {
       print('2. Platform is Android, checking API level');
@@ -113,8 +177,6 @@ class _InventoryScreenState extends State<InventoryScreen> {
     }
 
     print('4. Permission status: $status');
-
-// Handle different permission states
     if (status.isGranted) {
       print('5. Permission granted, opening image picker');
       try {
@@ -129,65 +191,26 @@ class _InventoryScreenState extends State<InventoryScreen> {
           return image;
         } else {
           print('7. No image selected (user canceled)');
-          /*  ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('No image was selected')),
-          ); */
           errorSnackbarwidget.show(context, 'No image was selected');
           return null;
         }
       } catch (e) {
         print('8. Error in image picker: $e');
-        /*   ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to pick image: $e')),
-        ); */
         errorSnackbarwidget.show(context, 'Failed to pick image: $e');
         return null;
       }
     } else if (status.isDenied) {
       print('5. Permission denied');
-      /*  ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text(
-              'Photo library access is required. Please enable it in settings.'),
-          action: SnackBarAction(
-            label: 'Settings',
-            onPressed: () {
-              print('6. Opening app settings for permission');
-              openAppSettings();
-            },
-          ),
-        ),
-      ); */
       errorSnackbarwidget.show(context,
           'Photo library access is required. Please enable it in settings.');
       return null;
     } else if (status.isPermanentlyDenied) {
       print('5. Permission permanently denied');
-      /* ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text(
-              'Photo library access is permanently denied. Please enable it in settings.'),
-          action: SnackBarAction(
-            label: 'Settings',
-            onPressed: () {
-              print('6. Opening app settings for permission');
-              openAppSettings();
-            },
-          ),
-        ),
-      ); */
-
       errorSnackbarwidget.show(context,
           'Photo library access is permanently denied. Please enable it in settings.');
       return null;
     } else if (status.isRestricted || status.isLimited) {
       print('5. Permission restricted or limited');
-      /*  ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-              'Photo library access is restricted or limited by device settings.'),
-        ),
-      ); */
       errorSnackbarwidget.show(context,
           'Photo library access is restricted or limited by device settings.');
       return null;
@@ -202,9 +225,6 @@ class _InventoryScreenState extends State<InventoryScreen> {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
       print('No user logged in');
-      /*  ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please sign in to add items')),
-      ); */
       errorSnackbarwidget.show(context, 'Please sign in to add items');
       return;
     }
@@ -228,10 +248,74 @@ class _InventoryScreenState extends State<InventoryScreen> {
       print('Item added to Firestore: ${item.name}');
     } catch (e) {
       print('Error adding item to Firestore: $e');
-      /*  ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error adding item: $e')),
-      ); */
       errorSnackbarwidget.show(context, 'Error adding item: $e');
+    }
+  }
+
+  Future<void> _updateItem(RentalItem item, String name, int quantity,
+      String price, String category, String? imageUrl) async {
+    print('Updating item: ${item.name} to new name: $name');
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      print('No user logged in');
+      errorSnackbarwidget.show(context, 'Please sign in to update items');
+      return;
+    }
+
+    final updatedItem = RentalItem(
+      id: item.id,
+      name: name,
+      quantity: quantity,
+      availableQuantity: quantity >= item.quantity - item.availableQuantity
+          ? quantity - (item.quantity - item.availableQuantity)
+          : item.availableQuantity, // Preserve rented quantity
+      price: price,
+      imageUrl: imageUrl ?? item.imageUrl,
+      available: quantity > 0,
+      category: category,
+      userId: user.uid,
+    );
+
+    try {
+      await FirebaseFirestore.instance
+          .collection('rental_items')
+          .doc(item.id)
+          .update(updatedItem.toMap());
+      print('Item updated in Firestore: ${updatedItem.name}');
+    } catch (e) {
+      print('Error updating item in Firestore: $e');
+      errorSnackbarwidget.show(context, 'Error updating item: $e');
+    }
+  }
+
+  Future<void> _deleteItem(RentalItem item) async {
+    print('Deleting item: ${item.name}');
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      print('No user logged in');
+      errorSnackbarwidget.show(context, 'Please sign in to delete items');
+      return;
+    }
+
+    try {
+      // Delete image from Cloudinary if it's not the default placeholder
+      if (item.imageUrl != 'https://via.placeholder.com/150') {
+        final success = await _deleteImageFromCloudinary(item.imageUrl);
+        if (!success) {
+          print(
+              'Failed to delete image from Cloudinary, proceeding with Firestore deletion');
+        }
+      }
+
+      // Delete item from Firestore
+      await FirebaseFirestore.instance
+          .collection('rental_items')
+          .doc(item.id)
+          .delete();
+      print('Item deleted from Firestore: ${item.name}');
+    } catch (e) {
+      print('Error deleting item: $e');
+      errorSnackbarwidget.show(context, 'Error deleting item: $e');
     }
   }
 
@@ -287,7 +371,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
         ],
       ),
       floatingActionButton: FloatingActionButton(
-        backgroundColor: Colors.blue[900],
+        backgroundColor: Colors.blue.shade900,
         onPressed: () {
           print('Floating action button pressed to open add item dialog');
           _showAddItemDialog(context);
@@ -312,7 +396,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
             return const Center(child: Text('No items found'));
           }
 
-          final items = snapshot.data!.docs
+          _allItems = snapshot.data!.docs
               .map((doc) {
                 final data = doc.data() as Map<String, dynamic>;
                 try {
@@ -327,7 +411,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
               .toList();
 
           final query = _searchController.text.trim().toLowerCase();
-          _filteredItems = items
+          _filteredItems = _allItems
               .where((item) => item.name.toLowerCase().contains(query))
               .toList();
           _sortItems();
@@ -371,7 +455,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                     Expanded(
                       child: _StatsCard(
                         title: 'Total Items',
-                        value: items.length.toString(),
+                        value: _allItems.length.toString(),
                         icon: Icons.inventory,
                         color: Colors.blue,
                       ),
@@ -380,7 +464,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                     Expanded(
                       child: _StatsCard(
                         title: 'Available',
-                        value: items
+                        value: _allItems
                             .where((item) => item.available)
                             .length
                             .toString(),
@@ -392,7 +476,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                     Expanded(
                       child: _StatsCard(
                         title: 'Out of Stock',
-                        value: items
+                        value: _allItems
                             .where((item) => !item.available)
                             .length
                             .toString(),
@@ -440,13 +524,14 @@ class _InventoryScreenState extends State<InventoryScreen> {
     final priceController = TextEditingController();
     final categoryController = TextEditingController();
     bool isPickingImage = false;
+
     print('Opening add item dialog');
     showDialog(
       context: context,
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setDialogState) {
-            print('Building dialog UI');
+            print('Building add item dialog UI');
             return AlertDialog(
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(15.0)),
@@ -509,11 +594,6 @@ class _InventoryScreenState extends State<InventoryScreen> {
                               });
                               if (image != null) {
                                 print('F. Showing success snackbar');
-                                /*  ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                      content:
-                                          Text('Image selected successfully')),
-                                ); */
                                 Snackbarwidget.show(
                                     context, 'Image selected successfully');
                               }
@@ -561,9 +641,6 @@ class _InventoryScreenState extends State<InventoryScreen> {
                         priceController.text.trim().isEmpty ||
                         categoryController.text.trim().isEmpty) {
                       print('Validation failed: empty fields');
-                      /*   ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Please fill all fields')),
-                      ); */
                       errorSnackbarwidget.show(
                           context, 'Please fill all fields');
                       return;
@@ -580,10 +657,6 @@ class _InventoryScreenState extends State<InventoryScreen> {
                             await _uploadImageToCloudinary(_selectedImage!);
                         if (imageUrl == null) {
                           print('Image upload failed');
-                          /*  ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                                content: Text('Failed to upload image')),
-                          ); */
                           errorSnackbarwidget.show(
                               context, 'Failed to upload image');
                           return;
@@ -603,22 +676,209 @@ class _InventoryScreenState extends State<InventoryScreen> {
                         _selectedImage = null;
                       });
                       Navigator.of(context).pop();
-                      /*  ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                            content:
-                                Text('${nameController.text.trim()} added!')),
-                      ); */
-                      /*  Snackbarwidget.show(
-                          context, '${nameController.text.trim()} added!'); */
                       Snackbarwidget.show(
                           context, '${nameController.text.trim()} added!');
                     } catch (e) {
                       print('Error in add item process: $e');
-                      /*   ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Error adding item: $e')),
-                      ); */
                       errorSnackbarwidget.show(
                           context, 'Error adding item: $e');
+                    }
+                  },
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _showEditItemDialog(BuildContext context, RentalItem item) {
+    final nameController = TextEditingController(text: item.name);
+    final quantityController =
+        TextEditingController(text: item.quantity.toString());
+    final priceController = TextEditingController(text: item.price);
+    final categoryController = TextEditingController(text: item.category);
+    bool isPickingImage = false;
+
+    print('Opening edit item dialog for: ${item.name}');
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            print('Building edit item dialog UI');
+            return AlertDialog(
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(15.0)),
+              title: const Text('Edit Item'),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextField(
+                      controller: nameController,
+                      decoration: const InputDecoration(
+                        labelText: 'Item Name',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: quantityController,
+                      decoration: const InputDecoration(
+                        labelText: 'Quantity',
+                        border: OutlineInputBorder(),
+                      ),
+                      keyboardType: TextInputType.number,
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: priceController,
+                      decoration: const InputDecoration(
+                        labelText: 'Price (e.g., GHC 5/unit)',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: categoryController,
+                      decoration: const InputDecoration(
+                        labelText: 'Category',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    ElevatedButton(
+                      onPressed: isPickingImage
+                          ? null
+                          : () async {
+                              print('A. Pick Image button pressed for edit');
+                              setDialogState(() {
+                                print('B. Setting isPickingImage to true');
+                                isPickingImage = true;
+                              });
+                              print('C. Calling _pickImage');
+                              final image = await _pickImage();
+                              print(
+                                  'D. _pickImage returned, image: ${image?.path}');
+                              setDialogState(() {
+                                print(
+                                    'E. Setting isPickingImage to false, updating _selectedImage');
+                                isPickingImage = false;
+                                _selectedImage = image;
+                              });
+                              if (image != null) {
+                                print('F. Showing success snackbar');
+                                Snackbarwidget.show(
+                                    context, 'Image selected successfully');
+                              }
+                            },
+                      child: Text(isPickingImage
+                          ? 'Picking...'
+                          : _selectedImage == null
+                              ? 'Change Image'
+                              : 'New Image Selected'),
+                    ),
+                    if (_selectedImage != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 12.0),
+                        child: Image.file(
+                          File(_selectedImage!.path),
+                          height: 100,
+                          width: 100,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) {
+                            print('Error displaying image: $error');
+                            return const Text('Error loading image');
+                          },
+                        ),
+                      ),
+                    if (_selectedImage == null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 12.0),
+                        child: Image.network(
+                          item.imageUrl,
+                          height: 100,
+                          width: 100,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) {
+                            print('Error displaying current image: $error');
+                            return const Text('Error loading current image');
+                          },
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  child: const Text('Cancel'),
+                  onPressed: () {
+                    print('Cancel button pressed, clearing _selectedImage');
+                    setState(() {
+                      _selectedImage = null;
+                    });
+                    Navigator.of(context).pop();
+                  },
+                ),
+                TextButton(
+                  child:
+                      Text('Update', style: TextStyle(color: Colors.blue[900])),
+                  onPressed: () async {
+                    print('Update button pressed');
+                    if (nameController.text.trim().isEmpty ||
+                        quantityController.text.trim().isEmpty ||
+                        priceController.text.trim().isEmpty ||
+                        categoryController.text.trim().isEmpty) {
+                      print('Validation failed: empty fields');
+                      errorSnackbarwidget.show(
+                          context, 'Please fill all fields');
+                      return;
+                    }
+
+                    try {
+                      final quantity =
+                          int.parse(quantityController.text.trim());
+                      print('Parsed quantity: $quantity');
+                      String? imageUrl;
+                      if (_selectedImage != null) {
+                        print('Uploading new image to Cloudinary');
+                        imageUrl =
+                            await _uploadImageToCloudinary(_selectedImage!);
+                        if (imageUrl == null) {
+                          print('Image upload failed');
+                          errorSnackbarwidget.show(
+                              context, 'Failed to upload image');
+                          return;
+                        }
+                        print('New image uploaded, URL: $imageUrl');
+                        // Delete old image if it's not the default
+                        if (item.imageUrl !=
+                            'https://via.placeholder.com/150') {
+                          await _deleteImageFromCloudinary(item.imageUrl);
+                        }
+                      }
+                      print('Calling _updateItem');
+                      await _updateItem(
+                        item,
+                        nameController.text.trim(),
+                        quantity,
+                        priceController.text.trim(),
+                        categoryController.text.trim(),
+                        imageUrl,
+                      );
+                      print('Clearing _selectedImage and closing dialog');
+                      setState(() {
+                        _selectedImage = null;
+                      });
+                      Navigator.of(context).pop();
+                      Snackbarwidget.show(
+                          context, '${nameController.text.trim()} updated!');
+                    } catch (e) {
+                      print('Error in update item process: $e');
+                      errorSnackbarwidget.show(
+                          context, 'Error updating item: $e');
                     }
                   },
                 ),
@@ -681,6 +941,23 @@ class _InventoryScreenState extends State<InventoryScreen> {
             ),
           ),
           actions: [
+            TextButton(
+              child: const Text('Edit', style: TextStyle(color: Colors.blue)),
+              onPressed: () {
+                print('Edit button pressed for: ${item.name}');
+                Navigator.of(context).pop();
+                _showEditItemDialog(context, item);
+              },
+            ),
+            TextButton(
+              child: const Text('Delete', style: TextStyle(color: Colors.red)),
+              onPressed: () async {
+                print('Delete button pressed for: ${item.name}');
+                Navigator.of(context).pop();
+                await _deleteItem(item);
+                Snackbarwidget.show(context, '${item.name} deleted!');
+              },
+            ),
             TextButton(
               child: const Text('Close'),
               onPressed: () {

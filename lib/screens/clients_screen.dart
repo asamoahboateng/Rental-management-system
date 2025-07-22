@@ -178,6 +178,165 @@ class _ClientsScreenState extends State<ClientsScreen>
     }
   }
 
+  Future<void> _updateClient(Client client, String name, String email,
+      String phone, String address) async {
+    print('Updating client: ${client.name} to new name: $name');
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      print('No user logged in');
+      _showAnimatedSnackBar(
+        SnackBar(
+          content: const Text('Please sign in to update clients'),
+          backgroundColor: Colors.red,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          behavior: SnackBarBehavior.floating,
+          margin: const EdgeInsets.all(16),
+          duration: const Duration(seconds: 2),
+          elevation: 6.0,
+        ),
+      );
+      return;
+    }
+
+    final updatedClient = Client(
+      id: client.id,
+      name: name,
+      email: email,
+      phone: phone,
+      address: address,
+      totalRentals: client.totalRentals,
+      activeRentals: client.activeRentals,
+      joinDate: client.joinDate,
+      userId: user.uid,
+    );
+
+    try {
+      await FirebaseFirestore.instance
+          .collection('clients')
+          .doc(client.id)
+          .update(updatedClient.toMap());
+      print('Client updated in Firestore: ${updatedClient.name}');
+      _showAnimatedSnackBar(
+        SnackBar(
+          content: Text('${updatedClient.name} updated!'),
+          backgroundColor: Colors.green,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          behavior: SnackBarBehavior.floating,
+          margin: const EdgeInsets.all(16),
+          duration: const Duration(seconds: 2),
+          elevation: 6.0,
+        ),
+      );
+    } catch (e) {
+      print('Error updating client in Firestore: $e');
+      _showAnimatedSnackBar(
+        SnackBar(
+          content: Text('Error updating client: $e'),
+          backgroundColor: Colors.red,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          behavior: SnackBarBehavior.floating,
+          margin: const EdgeInsets.all(16),
+          duration: const Duration(seconds: 2),
+          elevation: 6.0,
+        ),
+      );
+    }
+  }
+
+  Future<bool> _hasActiveRentals(String clientId) async {
+    try {
+      final snapshot = await FirebaseFirestore.instance
+          .collection('rentals')
+          .where('clientId', isEqualTo: clientId)
+          .where('status', whereIn: ['active', 'upcoming'])
+          .limit(1)
+          .get();
+      final hasActive = snapshot.docs.isNotEmpty;
+      print('Client $clientId has active rentals: $hasActive');
+      return hasActive;
+    } catch (e) {
+      print('Error checking active rentals for client $clientId: $e');
+      return false;
+    }
+  }
+
+  Future<void> _deleteClient(Client client) async {
+    print('Attempting to delete client: ${client.name}');
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      print('No user logged in');
+      _showAnimatedSnackBar(
+        SnackBar(
+          content: const Text('Please sign in to delete clients'),
+          backgroundColor: Colors.red,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          behavior: SnackBarBehavior.floating,
+          margin: const EdgeInsets.all(16),
+          duration: const Duration(seconds: 2),
+          elevation: 6.0,
+        ),
+      );
+      return;
+    }
+
+    // Check for active rentals
+    final hasActiveRentals = await _hasActiveRentals(client.id);
+    if (hasActiveRentals) {
+      print('Cannot delete client ${client.name} due to active rentals');
+      _showAnimatedSnackBar(
+        SnackBar(
+          content: const Text('Cannot delete client with active rentals'),
+          backgroundColor: Colors.red,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          behavior: SnackBarBehavior.floating,
+          margin: const EdgeInsets.all(16),
+          duration: const Duration(seconds: 3),
+          elevation: 6.0,
+        ),
+      );
+      return;
+    }
+
+    try {
+      await FirebaseFirestore.instance
+          .collection('clients')
+          .doc(client.id)
+          .delete();
+      print('Client deleted from Firestore: ${client.name}');
+      _showAnimatedSnackBar(
+        SnackBar(
+          content: Text('${client.name} deleted!'),
+          backgroundColor: Colors.green,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          behavior: SnackBarBehavior.floating,
+          margin: const EdgeInsets.all(16),
+          duration: const Duration(seconds: 2),
+          elevation: 6.0,
+        ),
+      );
+    } catch (e) {
+      print('Error deleting client from Firestore: $e');
+      _showAnimatedSnackBar(
+        SnackBar(
+          content: Text('Error deleting client: $e'),
+          backgroundColor: Colors.red,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          behavior: SnackBarBehavior.floating,
+          margin: const EdgeInsets.all(16),
+          duration: const Duration(seconds: 2),
+          elevation: 6.0,
+        ),
+      );
+    }
+  }
+
   Future<List<Map<String, dynamic>>> _fetchActiveRentals(
       String clientId) async {
     try {
@@ -271,6 +430,138 @@ class _ClientsScreenState extends State<ClientsScreen>
     );
   }
 
+  void _showEditClientDialog(BuildContext context, Client client) {
+    final nameController = TextEditingController(text: client.name);
+    final emailController = TextEditingController(text: client.email);
+    final phoneController = TextEditingController(text: client.phone);
+    final addressController = TextEditingController(text: client.address);
+
+    showDialog(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(15.0)),
+          title: const Text('Edit Client'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: nameController,
+                  decoration: const InputDecoration(
+                    labelText: 'Full Name',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: emailController,
+                  decoration: const InputDecoration(
+                    labelText: 'Email',
+                    border: OutlineInputBorder(),
+                  ),
+                  keyboardType: TextInputType.emailAddress,
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: phoneController,
+                  decoration: const InputDecoration(
+                    labelText: 'Phone Number',
+                    border: OutlineInputBorder(),
+                  ),
+                  keyboardType: TextInputType.phone,
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: addressController,
+                  decoration: const InputDecoration(
+                    labelText: 'Address',
+                    border: OutlineInputBorder(),
+                  ),
+                  maxLines: 2,
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              child: const Text('Cancel'),
+              onPressed: () {
+                print('Cancel button pressed in edit client dialog');
+                Navigator.of(dialogContext).pop();
+              },
+            ),
+            TextButton(
+              child: Text('Update', style: TextStyle(color: Colors.blue[900])),
+              onPressed: () async {
+                print('Update button pressed in edit client dialog');
+                if (nameController.text.trim().isEmpty ||
+                    emailController.text.trim().isEmpty ||
+                    phoneController.text.trim().isEmpty ||
+                    addressController.text.trim().isEmpty) {
+                  print('Validation failed: empty fields');
+                  _showAnimatedSnackBar(
+                    SnackBar(
+                      content: const Text('Please fill all fields'),
+                      backgroundColor: Colors.red,
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10)),
+                      behavior: SnackBarBehavior.floating,
+                      margin: const EdgeInsets.all(16),
+                      duration: const Duration(seconds: 2),
+                      elevation: 6.0,
+                    ),
+                  );
+                  return;
+                }
+                await _updateClient(
+                  client,
+                  nameController.text.trim(),
+                  emailController.text.trim(),
+                  phoneController.text.trim(),
+                  addressController.text.trim(),
+                );
+                Navigator.of(dialogContext).pop();
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showDeleteConfirmDialog(BuildContext context, Client client) {
+    showDialog(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(15.0)),
+          title: const Text('Delete Client'),
+          content: Text('Are you sure you want to delete ${client.name}?'),
+          actions: [
+            TextButton(
+              child: const Text('Cancel'),
+              onPressed: () {
+                print('Cancel button pressed in delete confirm dialog');
+                Navigator.of(dialogContext).pop();
+              },
+            ),
+            TextButton(
+              child: const Text('Delete', style: TextStyle(color: Colors.red)),
+              onPressed: () async {
+                print('Delete button pressed in delete confirm dialog');
+                Navigator.of(dialogContext).pop();
+                await _deleteClient(client);
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
@@ -308,8 +599,8 @@ class _ClientsScreenState extends State<ClientsScreen>
       floatingActionButton: FloatingActionButton(
         backgroundColor: Colors.blue[900],
         onPressed: () {
-          print('Floating action button pressed to open add client dialog');
-          _showAddClientDialog(context);
+          /*     print('Floating action button pressed to open add client dialog');
+          _showAddClientDialog(context); */
         },
         child: const Icon(Icons.person_add, color: Colors.white),
         tooltip: 'Add New Client',
@@ -452,106 +743,6 @@ class _ClientsScreenState extends State<ClientsScreen>
     );
   }
 
-  void _showAddClientDialog(BuildContext context) {
-    final nameController = TextEditingController();
-    final emailController = TextEditingController();
-    final phoneController = TextEditingController();
-    final addressController = TextEditingController();
-
-    showDialog(
-      context: context,
-      builder: (BuildContext dialogContext) {
-        return AlertDialog(
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(15.0)),
-          title: const Text('Add New Client'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: nameController,
-                  decoration: const InputDecoration(
-                    labelText: 'Full Name',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: emailController,
-                  decoration: const InputDecoration(
-                    labelText: 'Email',
-                    border: OutlineInputBorder(),
-                  ),
-                  keyboardType: TextInputType.emailAddress,
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: phoneController,
-                  decoration: const InputDecoration(
-                    labelText: 'Phone Number',
-                    border: OutlineInputBorder(),
-                  ),
-                  keyboardType: TextInputType.phone,
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: addressController,
-                  decoration: const InputDecoration(
-                    labelText: 'Address',
-                    border: OutlineInputBorder(),
-                  ),
-                  maxLines: 2,
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              child: const Text('Cancel'),
-              onPressed: () {
-                print('Cancel button pressed in add client dialog');
-                Navigator.of(dialogContext).pop();
-              },
-            ),
-            TextButton(
-              child: Text('Add', style: TextStyle(color: Colors.blue[900])),
-              onPressed: () async {
-                print('Add button pressed in add client dialog');
-                if (nameController.text.trim().isEmpty ||
-                    emailController.text.trim().isEmpty ||
-                    phoneController.text.trim().isEmpty ||
-                    addressController.text.trim().isEmpty) {
-                  print('Validation failed: empty fields');
-                  _showAnimatedSnackBar(
-                    SnackBar(
-                      content: const Text('Please fill all fields'),
-                      backgroundColor: Colors.red,
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10)),
-                      behavior: SnackBarBehavior.floating,
-                      margin: const EdgeInsets.all(16),
-                      duration: const Duration(seconds: 2),
-                      elevation: 6.0,
-                    ),
-                  );
-                  return;
-                }
-                await _addClient(
-                  nameController.text.trim(),
-                  emailController.text.trim(),
-                  phoneController.text.trim(),
-                  addressController.text.trim(),
-                );
-                Navigator.of(dialogContext).pop();
-              },
-            ),
-          ],
-        );
-      },
-    );
-  }
-
   void _showClientDetailsDialog(BuildContext context, Client client) {
     print('Opening client details dialog for: ${client.name}');
     showDialog(
@@ -588,6 +779,22 @@ class _ClientsScreenState extends State<ClientsScreen>
             ),
           ),
           actions: [
+            TextButton(
+              child: const Text('Edit', style: TextStyle(color: Colors.blue)),
+              onPressed: () {
+                print('Edit button pressed for: ${client.name}');
+                Navigator.of(dialogContext).pop();
+                _showEditClientDialog(context, client);
+              },
+            ),
+            TextButton(
+              child: const Text('Delete', style: TextStyle(color: Colors.red)),
+              onPressed: () {
+                print('Delete button pressed for: ${client.name}');
+                Navigator.of(dialogContext).pop();
+                _showDeleteConfirmDialog(context, client);
+              },
+            ),
             TextButton(
               child: const Text('Close'),
               onPressed: () {
@@ -679,7 +886,13 @@ class _ClientCard extends StatelessWidget {
                 radius: 30,
                 backgroundColor: Colors.blue[900],
                 child: Text(
-                  client.name.split(' ').map((n) => n[0]).take(2).join(),
+                  client.name.isNotEmpty
+                      ? client.name
+                          .split(' ')
+                          .map((n) => n.isNotEmpty ? n[0] : '')
+                          .take(2)
+                          .join()
+                      : 'C',
                   style: const TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.bold,
@@ -692,7 +905,7 @@ class _ClientCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      client.name,
+                      client.name.isNotEmpty ? client.name : 'Unknown Client',
                       style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
@@ -701,7 +914,7 @@ class _ClientCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      client.email,
+                      client.email.isNotEmpty ? client.email : 'No email',
                       style: const TextStyle(
                         fontSize: 14,
                         color: Colors.grey,
@@ -709,7 +922,7 @@ class _ClientCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      client.phone,
+                      client.phone.isNotEmpty ? client.phone : 'No phone',
                       style: const TextStyle(
                         fontSize: 14,
                         color: Colors.grey,
